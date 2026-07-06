@@ -1,0 +1,17 @@
+{
+  "name": "halo-chatbot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI product chatbot for Halo Blinds — Vercel Edge + Claude Haiku + Upstash Redis",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "node dev-server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@upstash/redis": "^1.34.0"
+  }
+}

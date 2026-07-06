@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Halo Total Blackout Blind, Local Test</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#faf8f5;color:#111;-webkit-font-smoothing:antialiased;line-height:1.5}
+  .site-nav{max-width:1200px;margin:0 auto;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe7e0}
+  .brand{font-weight:700;font-size:20px;letter-spacing:.15em;color:#111}
+  .nav-links{display:flex;gap:24px;font-size:13px;color:#555}
+  .nav-links a{color:inherit;text-decoration:none}
+  .nav-links a:hover{color:#111}
+  .dev-banner{background:#111;color:#fff;text-align:center;padding:8px;font-size:12px;letter-spacing:.02em}
+  .dev-banner strong{color:#4ade80;margin-right:6px}
+
+  .product-page{max-width:1200px;margin:0 auto;padding:40px 24px 80px;display:grid;grid-template-columns:1.1fr 1fr;gap:56px}
+  .product-image{background:#f0ede6;border-radius:16px;padding:40px;display:flex;align-items:center;justify-content:center;aspect-ratio:1}
+  .window-svg{width:100%;max-width:400px;height:auto}
+  .stars{color:#111;font-size:13px;margin-bottom:8px;letter-spacing:.02em}
+  .stars .n{color:#666;margin-left:4px}
+  .product-title{font-size:32px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin:0 0 20px}
+  .price-row{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+  .price-current{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+  .price-old{font-size:15px;color:#999;text-decoration:line-through;font-variant-numeric:tabular-nums}
+  .price-badge{background:#111;color:#fff;font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;letter-spacing:.03em}
+  .klarna{font-size:12px;color:#666;margin-bottom:24px}
+  .option-row{margin-bottom:20px}
+  .option-label{font-size:13px;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;font-weight:500}
+  .option-label .selected{color:#111;text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px}
+  .swatch-row{display:flex;gap:10px}
+  .swatch{width:32px;height:32px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s ease}
+  .swatch.on{border-color:#111;transform:scale(1.08)}
+  .swatch.graphite{background:#3a3a3d}
+  .swatch.quartz{background:#e8e4dc;border:1px solid #ccc}
+  .swatch.navy{background:#1e3a5f}
+  .swatch.titanium{background:#a89a82}
+  .dir-row{display:flex;gap:6px}
+  .dir-pill{border:1px solid #ddd;background:#fff;padding:10px 16px;border-radius:8px;font-size:12px;cursor:pointer;color:#555;font-family:inherit}
+  .dir-pill.on{background:#111;color:#fff;border-color:#111}
+  .size-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+  .size-input{border:1px solid #ddd;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px;background:#fff}
+  .size-input span{color:#999}
+  .cta-btn{width:100%;background:#111;color:#fff;border:none;padding:16px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.03em;font-family:inherit}
+  .ship-note{font-size:11px;color:#666;text-align:center;margin-top:10px}
+  .dashboard-link{position:fixed;top:12px;left:12px;background:#fff;border:1px solid #ddd;padding:6px 12px;border-radius:8px;font-size:12px;color:#333;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.06);z-index:100}
+
+  /* Chat widget, copied from halo-chatbot.liquid, minus Liquid tags */
+  .halo-chat-launcher{position:fixed;right:24px;bottom:24px;width:60px;height:60px;border-radius:50%;background:#fff;border:none;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;z-index:9998;transition:transform .15s ease;font-family:inherit;padding:0;overflow:hidden}
+  .halo-chat-launcher:hover{transform:scale(1.05)}
+  .halo-chat-launcher::after{content:'';position:absolute;top:4px;right:4px;width:12px;height:12px;background:#4ade80;border:2px solid #fff;border-radius:50%;z-index:2}
+  .halo-launcher-avatar{width:100%;height:100%;object-fit:cover;border-radius:50%}
+  .halo-chat-launcher .halo-chat-close{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#111;color:#fff}
+  .halo-chat-launcher .halo-chat-close svg{width:22px;height:22px}
+  .halo-chat-launcher.is-open .halo-launcher-avatar{display:none}
+  .halo-chat-launcher.is-open::after{display:none}
+  .halo-chat-launcher.is-open .halo-chat-close{display:flex}
+  .halo-chat-panel{position:fixed;right:24px;bottom:96px;width:380px;max-width:calc(100vw - 48px);height:560px;max-height:calc(100vh - 130px);background:#fff;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.16);display:none;flex-direction:column;overflow:hidden;z-index:9997;font-family:inherit;color:#111}
+  .halo-chat-panel.is-open{display:flex}
+  .halo-chat-header{padding:14px 16px;background:#111;color:#fff;display:flex;align-items:center;gap:12px}
+  .halo-avatar-wrap{position:relative;flex-shrink:0}
+  .halo-header-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#fff;display:block}
+  .halo-avatar-wrap::after{content:'';position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;background:#4ade80;border:2px solid #111;border-radius:50%}
+  .halo-chat-header .halo-title{font-weight:600;font-size:15px;letter-spacing:-.01em;line-height:1.2}
+  .halo-chat-header .halo-sub{font-size:12px;opacity:.7;margin-top:3px}
+  .halo-chat-messages{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;background:#fafafa}
+  .halo-msg{max-width:85%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;word-wrap:break-word;white-space:pre-wrap}
+  .halo-msg.user{align-self:flex-end;background:#111;color:#fff;border-bottom-right-radius:4px}
+  .halo-msg.bot{align-self:flex-start;background:#fff;color:#111;border:1px solid #eee;border-bottom-left-radius:4px}
+  .halo-typing{align-self:flex-start;background:#fff;color:#111;border:1px solid #eee;border-radius:14px;border-bottom-left-radius:4px;padding:14px 16px;display:inline-flex;gap:4px;align-items:center}
+  .halo-typing span{width:7px;height:7px;background:#bbb;border-radius:50%;display:inline-block;animation:halo-typing-bounce 1.3s ease-in-out infinite}
+  .halo-typing span:nth-child(2){animation-delay:.18s}
+  .halo-typing span:nth-child(3){animation-delay:.36s}
+  @keyframes halo-typing-bounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+  .halo-chat-suggestions{padding:0 18px 12px;display:flex;flex-wrap:wrap;gap:6px;background:#fafafa}
+  .halo-chip{background:#fff;border:1px solid #ddd;color:#333;padding:6px 12px;border-radius:16px;font-size:12px;cursor:pointer;font-family:inherit}
+  .halo-chip:hover{background:#f0f0f0}
+  .halo-chat-input{padding:12px 14px 14px;background:#fff;border-top:1px solid #eee;display:flex;gap:8px}
+  .halo-chat-input textarea{flex:1;border:1px solid #ddd;border-radius:20px;padding:10px 14px;font-size:14px;resize:none;font-family:inherit;outline:none;max-height:100px;line-height:1.4}
+  .halo-chat-input textarea:focus{border-color:#111}
+  .halo-chat-input button{background:#111;color:#fff;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+  .halo-chat-input button:disabled{opacity:.4;cursor:not-allowed}
+  .halo-chat-input button svg{width:16px;height:16px}
+  .halo-chat-teaser{position:fixed;right:24px;bottom:96px;background:#fff;border-radius:18px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:14px;color:#111;z-index:9996;max-width:280px;cursor:pointer;display:none;align-items:center;gap:10px;font-family:inherit;line-height:1.35;border:1px solid rgba(0,0,0,.05)}
+  .halo-chat-teaser.is-visible{display:flex;animation:halo-teaser-in .35s cubic-bezier(.22,1,.36,1)}
+  @keyframes halo-teaser-in{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+  .halo-chat-teaser::after{content:'';position:absolute;right:22px;bottom:-6px;width:12px;height:12px;background:#fff;transform:rotate(45deg);border-right:1px solid rgba(0,0,0,.06);border-bottom:1px solid rgba(0,0,0,.06)}
+  .halo-teaser-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;background:#f0ede6;flex-shrink:0}
+  .halo-teaser-text{flex:1;padding-right:4px}
+  .halo-chat-teaser-close{width:22px;height:22px;border:none;background:transparent;cursor:pointer;color:#999;font-size:18px;line-height:1;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:inherit;flex-shrink:0}
+  .halo-chat-teaser-close:hover{background:#f4f4f4;color:#333}
+
+  @media (max-width:900px){
+    .product-page{grid-template-columns:1fr;gap:32px;padding:24px 16px 60px}
+    .halo-chat-panel{right:12px;left:12px;width:auto;bottom:88px;height:calc(100vh - 110px)}
+    .halo-chat-launcher{right:16px;bottom:16px}
+    .halo-chat-teaser{right:14px;bottom:82px;max-width:calc(100vw - 28px)}
+  }
+</style>
+</head>
+<body>
+
+<div class="dev-banner"><strong>LOCAL TEST</strong> API calls go to this dev server · <a href="/dashboard" style="color:#4ade80;text-decoration:underline">View dashboard</a></div>
+
+<a href="/dashboard" class="dashboard-link">📊 Dashboard</a>
+
+<div class="site-nav">
+  <div class="brand">HALO</div>
+  <div class="nav-links"><a href="#">Shop</a><a href="#">How it works</a><a href="#">Reviews</a><a href="#">Cart (0)</a></div>
+</div>
+
+<main class="product-page">
+  <div class="product-image">
+    <svg class="window-svg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+      <rect x="40" y="30" width="320" height="340" rx="4" fill="none" stroke="#1e3a5f" stroke-width="6"/>
+      <line x1="200" y1="30" x2="200" y2="370" stroke="#1e3a5f" stroke-width="4"/>
+      <line x1="40" y1="200" x2="360" y2="200" stroke="#1e3a5f" stroke-width="4"/>
+      <rect x="46" y="36" width="149" height="158" fill="#e8f0f8" opacity=".6"/>
+      <rect x="205" y="36" width="149" height="158" fill="#e8f0f8" opacity=".6"/>
+      <rect x="46" y="206" width="149" height="158" fill="#e8f0f8" opacity=".6"/>
+      <rect x="205" y="206" width="149" height="158" fill="#111" opacity=".92"/>
+      <text x="200" y="393" text-anchor="middle" fill="#666" font-size="10" font-family="sans-serif" letter-spacing="1">SLIDE OPEN · TOTAL BLACKOUT</text>
+    </svg>
+  </div>
+
+  <div>
+    <div class="stars">★★★★★ <span class="n">4.8 · 1,247 reviews</span></div>
+    <h1 class="product-title">Total Blackout Blind</h1>
+    <div class="price-row"><span class="price-current">€79.95</span><span class="price-old">€145.00</span><span class="price-badge">45% OFF</span></div>
+    <div class="klarna">or 4 interest-free payments of €19.99 with Klarna</div>
+    <div class="option-row"><div class="option-label">Colour <span class="selected">Graphite</span></div><div class="swatch-row"><div class="swatch graphite on"></div><div class="swatch quartz"></div></div></div>
+    <div class="option-row"><div class="option-label">Opening Direction</div><div class="dir-row"><button class="dir-pill on">Right to left</button><button class="dir-pill">Left to right</button><button class="dir-pill">Top to bottom</button></div></div>
+    <div class="option-row"><div class="option-label">Size</div><div class="size-row"><div class="size-input">Width <span>- cm</span></div><div class="size-input">Height <span>- cm</span></div></div></div>
+    <button class="cta-btn">Enter your measurements to continue</button>
+    <div class="ship-note">Your order ships in 3-7 working days</div>
+  </div>
+</main>
+
+<div class="halo-chat-teaser" id="halo-chat-teaser" role="button" tabindex="0" aria-label="Ask us, open chat">
+  <img class="halo-teaser-avatar" src="https://cdn.shopify.com/s/files/1/1046/8307/7966/files/Titel_12.png?v=1783170226" alt="">
+  <span class="halo-teaser-text">Ask us, we are happy to help!</span>
+  <button class="halo-chat-teaser-close" id="halo-chat-teaser-close" aria-label="Dismiss">×</button>
+</div>
+
+<button class="halo-chat-launcher" id="halo-chat-launcher" aria-label="Open chat">
+  <img class="halo-launcher-avatar" src="https://cdn.shopify.com/s/files/1/1046/8307/7966/files/Titel_12.png?v=1783170226" alt="Halo">
+  <span class="halo-chat-close" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </span>
+</button>
+
+<div class="halo-chat-panel" id="halo-chat-panel" role="dialog">
+  <div class="halo-chat-header">
+    <div class="halo-avatar-wrap">
+      <img class="halo-header-avatar" src="https://cdn.shopify.com/s/files/1/1046/8307/7966/files/Titel_12.png?v=1783170226" alt="Halo">
+    </div>
+    <div>
+      <div class="halo-title">Halo</div>
+      <div class="halo-sub">Usually replies in a few minutes</div>
+    </div>
+  </div>
+  <div class="halo-chat-messages" id="halo-chat-messages">
+    <div class="halo-msg bot">Hi there 👋 Ask us anything about the Halo blinds, measuring, colours, delivery, or fit. Happy to help!</div>
+  </div>
+  <div class="halo-chat-suggestions" id="halo-chat-suggestions">
+    <button class="halo-chip" data-q="How do I measure my window?">How do I measure?</button>
+    <button class="halo-chip" data-q="How much does it cost for a 120x150 cm window?">Price for my size?</button>
+    <button class="halo-chip" data-q="When will my order be delivered?">Delivery time?</button>
+    <button class="halo-chip" data-q="Do the blinds block 100% of light?">100% blackout?</button>
+  </div>
+  <form class="halo-chat-input" id="halo-chat-form">
+    <textarea id="halo-chat-textarea" placeholder="Ask about sizing, colours, delivery..." rows="1" autocomplete="off"></textarea>
+    <button type="submit" id="halo-chat-send" aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </form>
+</div>
+
+<script>
+(function(){
+  const API_URL = '/api/chat';
+  const launcher = document.getElementById('halo-chat-launcher');
+  const panel = document.getElementById('halo-chat-panel');
+  const form = document.getElementById('halo-chat-form');
+  const textarea = document.getElementById('halo-chat-textarea');
+  const sendBtn = document.getElementById('halo-chat-send');
+  const messagesEl = document.getElementById('halo-chat-messages');
+  const suggestionsEl = document.getElementById('halo-chat-suggestions');
+
+  let conversationId = sessionStorage.getItem('halo_conv_id');
+  if(!conversationId){
+    conversationId = 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    sessionStorage.setItem('halo_conv_id', conversationId);
+  }
+  const history = [];
+  const productContext = {
+    product_title: 'Halo Total Blackout Blind',
+    product_price_display: '€79.95',
+    product_compare_at_display: '€145.00',
+    product_price_number: '79.95',
+    currency_code: 'EUR',
+    rate_per_m2: 30,
+    mosquito_rate_per_m2: 12,
+    min_recess_cm: 3,
+    product_url: window.location.href,
+    page_url: window.location.href
+  };
+
+  function toggleChat(){
+    const open = panel.classList.toggle('is-open');
+    launcher.classList.toggle('is-open', open);
+    if(open){
+      hideTeaser();
+      chatOpenedOnce = true;
+      setTimeout(()=> textarea.focus(), 80);
+    }
+  }
+  launcher.addEventListener('click', toggleChat);
+
+  // Teaser popup: shows after a delay, once per session, if chat not yet opened
+  const teaser = document.getElementById('halo-chat-teaser');
+  const teaserClose = document.getElementById('halo-chat-teaser-close');
+  const TEASER_DELAY = 45000;
+  const TEASER_KEY = 'halo_teaser_dismissed';
+  let chatOpenedOnce = false;
+
+  function hideTeaser(){ teaser.classList.remove('is-visible'); }
+  function dismissTeaser(){
+    hideTeaser();
+    try { sessionStorage.setItem(TEASER_KEY, '1'); } catch(e){}
+  }
+
+  teaser.addEventListener('click', function(e){
+    if(e.target.closest('.halo-chat-teaser-close')) return;
+    dismissTeaser();
+    if(!panel.classList.contains('is-open')) toggleChat();
+  });
+  teaser.addEventListener('keydown', function(e){
+    if(e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      dismissTeaser();
+      if(!panel.classList.contains('is-open')) toggleChat();
+    }
+  });
+  teaserClose.addEventListener('click', function(e){
+    e.stopPropagation();
+    dismissTeaser();
+  });
+
+  setTimeout(function(){
+    if(chatOpenedOnce) return;
+    try { if(sessionStorage.getItem(TEASER_KEY)) return; } catch(e){}
+    teaser.classList.add('is-visible');
+  }, TEASER_DELAY);
+
+  function addMsg(role, text){
+    const div = document.createElement('div');
+    div.className = 'halo-msg ' + role;
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  suggestionsEl.addEventListener('click', function(e){
+    const btn = e.target.closest('.halo-chip');
+    if(!btn) return;
+    textarea.value = btn.dataset.q;
+    form.requestSubmit();
+  });
+
+  textarea.addEventListener('input', function(){
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+  });
+  textarea.addEventListener('keydown', function(e){
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); form.requestSubmit(); }
+  });
+
+  function addTyping(){
+    const el = document.createElement('div');
+    el.className = 'halo-typing';
+    el.innerHTML = '<span></span><span></span><span></span>';
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return el;
+  }
+
+  async function send(userText){
+    if(!userText.trim()) return;
+    suggestionsEl.style.display = 'none';
+    addMsg('user', userText);
+    history.push({ role: 'user', content: userText });
+    textarea.value = '';
+    textarea.style.height = 'auto';
+    sendBtn.disabled = true;
+    const typingEl = addTyping();
+    let botDiv = null;
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: conversationId, messages: history, product_context: productContext })
+      });
+      if(!res.ok || !res.body) throw new Error('Bad response ' + res.status);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      while(true){
+        const { done, value } = await reader.read();
+        if(done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        if(!chunk) continue;
+        if(!botDiv){ typingEl.remove(); botDiv = addMsg('bot', ''); }
+        fullText += chunk;
+        botDiv.textContent = fullText;
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+      history.push({ role: 'assistant', content: fullText });
+    } catch(err){
+      typingEl.remove();
+      addMsg('bot', "Sorry, something went wrong. Please email support@haloblinds.com or try again in a moment.");
+      console.error('[halo-chat]', err);
+    } finally {
+      sendBtn.disabled = false;
+      textarea.focus();
+    }
+  }
+
+  form.addEventListener('submit', function(e){ e.preventDefault(); send(textarea.value); });
+})();
+</script>
+</body>
+</html>
