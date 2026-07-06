@@ -63,7 +63,7 @@ def mock_reply(text: str, ctx: dict) -> str:
         return "Yes, 100% blackout, that's really the whole point 🙂 The rigid frame seals against your window so no light leaks around the edges. That edge-leak is the enemy that regular curtains and roller blinds can't beat, especially for early-morning sun."
 
     if re.search(r"colou?r|kleur|farbe|which color|match|wall", lower):
-        return "Two colours: **Graphite** (dark charcoal) or **Quartz** (soft off-white). The frame and fabric come as one, no mix-and-match. Quartz blends into white walls; Graphite adds contrast. Need a different colour? Email help@haloblinds.com and we can do a custom order."
+        return "Two colours: Graphite (dark charcoal) or Quartz (soft off-white). The frame and fabric come as one, no mix-and-match. Quartz blends into white walls; Graphite adds contrast. Need a different colour? Email help@haloblinds.com and we can arrange a custom order."
 
     if re.search(r"\breturn\b|refund|money.back|30.day", lower):
         return "You get a 30-day try-at-home money-back guarantee, always. Plus our Free Fit Guarantee, if you measured wrong, we replace it free of charge. That covers the biggest worry most customers have."
@@ -75,7 +75,7 @@ def mock_reply(text: str, ctx: dict) -> str:
         return "HaloBlinds is built for long-term daily use, with an expected lifespan of up to 30 years. It also comes with a 2-year warranty."
 
     if re.search(r"velux|skylight|dakraam|dachfenster|\bbay\b|\btilt\b|tilt.and.turn|casement|patio|awning|sash|\barch\b|\bround\b|sliding door", lower):
-        return "Yes, we work with European windows, tilt-and-turn, fixed, sliding, casement, hung, sash, bay, awning and skylights. For anything really unusual, drop us a line at help@haloblinds.com with a photo and rough measurements and we'll confirm it works. You can copy this:\n\n> Hi Halo team! I have a [window type] and would like to check if the Halo fits. Rough size is [WxH cm]. Thanks!"
+        return "Yes, we work with European windows, tilt-and-turn, fixed, sliding, casement, hung, sash, bay, awning and skylights. What's the rough size of your window and which type is it exactly? Once I know I can help you prep the details to email help@haloblinds.com so we can confirm it fits."
 
     if re.search(r"damage|broke|broken|kapot|beschädigt", lower):
         return "If it arrives damaged, we'll replace it free, just send a photo to help@haloblinds.com and we handle it. Same for a wrong colour or wrong size arrival."
@@ -114,7 +114,7 @@ def mock_reply(text: str, ctx: dict) -> str:
         return "You'll find all our real customer reviews right on the product page, scroll down to see them."
 
     if re.search(r"sample|swatch|monster|proben", lower):
-        return "We do offer fabric samples, just email us at help@haloblinds.com with your address and we'll send them out. Something like:\n\n> Hi Halo team! Could I get a Graphite and a Quartz sample sent to [address]? Thanks!"
+        return "We do offer fabric samples! What's your delivery address? Once I have that I can help you fire off an email to help@haloblinds.com and we'll pop them in the post."
 
     if re.search(r"phone|call|telefon|bellen|number|contact", lower):
         return "We do email-only support at help@haloblinds.com, response within 12 hours on average. No phone team yet, but the email is fast!"
@@ -126,7 +126,7 @@ def mock_reply(text: str, ctx: dict) -> str:
         return "We'd love that! We have an affiliate program for creators and UGC, you can sign up here: https://affiliate.haloblinds.com/"
 
     if re.search(r"bulk|wholesale|trade|hotel|hospitality|large order|many", lower):
-        return "For larger orders, please contact us at help@haloblinds.com and we'll set you up. You can copy this:\n\n> Hi Halo team! Interested in a larger order, roughly [X] blinds for [project type]. Could we discuss? Thanks!"
+        return "For larger orders we handle everything one-on-one. Roughly how many blinds are you thinking, and what's the project? Once I have that I can help you send a quick email to help@haloblinds.com."
 
     if re.search(r"^(hi|hello|hey|hoi|hallo|hai|hola|bonjour|guten|good\s(morn|even))", lower):
         return "Hey! Happy to help. What would you like to know about the Halo blinds, sizing, colours, delivery, or something else?"
