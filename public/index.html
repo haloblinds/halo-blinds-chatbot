@@ -320,7 +320,7 @@
       history.push({ role: 'assistant', content: fullText });
     } catch(err){
       typingEl.remove();
-      addMsg('bot', "Sorry, something went wrong. Please email support@haloblinds.com or try again in a moment.");
+      addMsg('bot', "Sorry, something went wrong on our side. Please email help@haloblinds.com or try again in a moment.");
       console.error('[halo-chat]', err);
     } finally {
       sendBtn.disabled = false;
