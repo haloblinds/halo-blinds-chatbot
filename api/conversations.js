@@ -2,7 +2,18 @@ import { Redis } from "@upstash/redis";
 
 export const config = { runtime: "edge" };
 
-const redis = Redis.fromEnv();
+let _redis = null;
+function getRedis() {
+  if (!_redis) {
+    const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (!url || !token) {
+      throw new Error("Missing Upstash env vars");
+    }
+    _redis = new Redis({ url, token });
+  }
+  return _redis;
+}
 
 function unauthorized() {
   return new Response("Unauthorized", {
@@ -36,6 +47,7 @@ export default async function handler(req) {
   const action = url.searchParams.get("action") || "list";
 
   try {
+    const redis = getRedis();
     if (action === "list") {
       const limit = Math.min(
         parseInt(url.searchParams.get("limit") || "50", 10) || 50,

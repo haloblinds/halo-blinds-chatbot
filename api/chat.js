@@ -3,13 +3,39 @@ import { Redis } from "@upstash/redis";
 
 export const config = { runtime: "edge" };
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const redis = Redis.fromEnv();
-
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+
+// Lazy singletons so that missing env vars don't crash the module at import time.
+// CORS preflight (OPTIONS) must ALWAYS succeed even if secrets are misconfigured.
+let _anthropic = null;
+let _redis = null;
+function getAnthropic() {
+  if (!_anthropic) {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY env var is missing");
+    }
+    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return _anthropic;
+}
+function getRedis() {
+  if (!_redis) {
+    const url =
+      process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+    const token =
+      process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (!url || !token) {
+      throw new Error(
+        "Missing Upstash env vars (KV_REST_API_URL/TOKEN or UPSTASH_REDIS_REST_URL/TOKEN)"
+      );
+    }
+    _redis = new Redis({ url, token });
+  }
+  return _redis;
+}
 
 const SYSTEM_PROMPT = `You are the on-page assistant for Halo Blinds, a Dutch brand that makes made-to-measure total-blackout window blinds. You answer visitors on the Halo Blinds product page.
 
@@ -251,12 +277,13 @@ export default async function handler(req) {
     });
   }
 
-  // Log latest user question (fire and forget)
+  // Log latest user question (fire and forget). Never crash the response on Redis errors.
   const latestUser = [...cleanMessages].reverse().find((m) => m.role === "user");
   const now = Date.now();
   const convKey = `halo:conv:${conversation_id}`;
   const logPromise = (async () => {
     try {
+      const redis = getRedis();
       await redis.zadd("halo:conversations", { score: now, member: conversation_id });
       await redis.hset(convKey, {
         updated_at: now,
@@ -296,7 +323,7 @@ export default async function handler(req) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const claudeStream = anthropic.messages.stream({
+        const claudeStream = getAnthropic().messages.stream({
           model: "claude-haiku-4-5",
           max_tokens: 800,
           system: [
@@ -327,7 +354,7 @@ export default async function handler(req) {
       } finally {
         try {
           if (fullReply) {
-            await redis.rpush(
+            await getRedis().rpush(
               `${convKey}:messages`,
               JSON.stringify({
                 role: "assistant",
