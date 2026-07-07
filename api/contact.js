@@ -2,33 +2,12 @@ import { Redis } from "@upstash/redis";
 
 export const config = { runtime: "edge" };
 
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
-  .split(",")
-  .map((s) => s.trim().replace(/^["'](.*)["']$/, "$1").trim())
-  .filter(Boolean);
-
 function cleanEnv(v) {
   if (!v) return v;
   return v.trim().replace(/^["'](.*)["']$/, "$1").trim();
 }
-
-function corsHeaders(origin) {
-  let allowed = "*";
-  if (ALLOWED_ORIGINS.length === 0) {
-    allowed = origin || "*";
-  } else if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    allowed = origin;
-  } else if (ALLOWED_ORIGINS[0]) {
-    allowed = ALLOWED_ORIGINS[0];
-  }
-  if (typeof allowed !== "string" || /[\r\n\t\0]/.test(allowed)) allowed = "*";
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    Vary: "Origin",
-  };
-}
+// CORS headers are set at the edge by vercel.json, so 404s and 500s also carry them.
+// This function never touches CORS headers itself, that avoids double-headers.
 
 let _redis = null;
 function getRedis() {
@@ -115,8 +94,8 @@ function isValidEmail(s) {
 
 export default async function handler(req) {
   const origin = req.headers.get("origin") || "";
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
-  if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: corsHeaders(origin) });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204 });
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
   let payload;
   try {
@@ -124,7 +103,7 @@ export default async function handler(req) {
   } catch {
     return new Response(JSON.stringify({ ok: false, error: "bad_json" }), {
       status: 400,
-      headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   }
 
@@ -138,13 +117,13 @@ export default async function handler(req) {
   if (!isValidEmail(email)) {
     return new Response(JSON.stringify({ ok: false, error: "invalid_email" }), {
       status: 400,
-      headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   }
   if (!message || message.length < 2) {
     return new Response(JSON.stringify({ ok: false, error: "empty_message" }), {
       status: 400,
-      headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   }
 
@@ -182,6 +161,6 @@ export default async function handler(req) {
   // because it's still logged in Redis and visible in the dashboard.
   return new Response(
     JSON.stringify({ ok: true, email_sent: emailResult.ok, reason: emailResult.reason || null }),
-    { status: 200, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
+    { status: 200, headers: { "Content-Type": "application/json" } }
   );
 }
