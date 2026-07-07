@@ -65,10 +65,11 @@
   .halo-chat-header .halo-title{font-weight:600;font-size:15px;letter-spacing:-.01em;line-height:1.2}
   .halo-chat-header .halo-sub{font-size:12px;opacity:.7;margin-top:3px}
   .halo-chat-messages{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;background:#fafafa}
-  .halo-msg{max-width:85%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;word-wrap:break-word;white-space:pre-wrap}
-  .halo-msg.user{align-self:flex-end;background:#111;color:#fff;border-bottom-right-radius:4px}
-  .halo-msg.bot{align-self:flex-start;background:#fff;color:#111;border:1px solid #eee;border-bottom-left-radius:4px}
-  .halo-typing{align-self:flex-start;background:#fff;color:#111;border:1px solid #eee;border-radius:14px;border-bottom-left-radius:4px;padding:14px 16px;display:inline-flex;gap:4px;align-items:center}
+  .halo-msg{max-width:85%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;word-wrap:break-word;white-space:pre-wrap;animation:halo-msg-in .28s cubic-bezier(.22,1.35,.36,1);transform-origin:bottom center}
+  .halo-msg.user{align-self:flex-end;background:#111;color:#fff;border-bottom-right-radius:4px;transform-origin:bottom right}
+  .halo-msg.bot{align-self:flex-start;background:#fff;color:#111;border:1px solid #eee;border-bottom-left-radius:4px;transform-origin:bottom left}
+  @keyframes halo-msg-in{from{opacity:0;transform:translateY(8px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}
+  .halo-typing{align-self:flex-start;background:#fff;color:#111;border:1px solid #eee;border-radius:14px;border-bottom-left-radius:4px;padding:14px 16px;display:inline-flex;gap:4px;align-items:center;animation:halo-msg-in .28s cubic-bezier(.22,1.35,.36,1);transform-origin:bottom left}
   .halo-typing span{width:7px;height:7px;background:#bbb;border-radius:50%;display:inline-block;animation:halo-typing-bounce 1.3s ease-in-out infinite}
   .halo-typing span:nth-child(2){animation-delay:.18s}
   .halo-typing span:nth-child(3){animation-delay:.36s}
@@ -127,8 +128,8 @@
   <div>
     <div class="stars">★★★★★ <span class="n">4.8 · 1,247 reviews</span></div>
     <h1 class="product-title">Total Blackout Blind</h1>
-    <div class="price-row"><span class="price-current">€79.95</span><span class="price-old">€145.00</span><span class="price-badge">45% OFF</span></div>
-    <div class="klarna">or 4 interest-free payments of €19.99 with Klarna</div>
+    <div class="price-row"><span class="price-current">$79.95</span><span class="price-old">$145.00</span><span class="price-badge">45% OFF</span></div>
+    <div class="klarna">or 4 interest-free payments of $19.99 with Klarna</div>
     <div class="option-row"><div class="option-label">Colour <span class="selected">Graphite</span></div><div class="swatch-row"><div class="swatch graphite on"></div><div class="swatch quartz"></div></div></div>
     <div class="option-row"><div class="option-label">Opening Direction</div><div class="dir-row"><button class="dir-pill on">Right to left</button><button class="dir-pill">Left to right</button><button class="dir-pill">Top to bottom</button></div></div>
     <div class="option-row"><div class="option-label">Size</div><div class="size-row"><div class="size-input">Width <span>- cm</span></div><div class="size-input">Height <span>- cm</span></div></div></div>
@@ -196,11 +197,11 @@
   const history = [];
   const productContext = {
     product_title: 'Halo Total Blackout Blind',
-    product_price_display: '€79.95',
-    product_compare_at_display: '€145.00',
+    product_price_display: '$79.95',
+    product_compare_at_display: '$145.00',
     product_price_number: '79.95',
-    currency_code: 'EUR',
-    rate_per_m2: 30,
+    currency_code: 'USD',
+    rate_per_m2: 80,
     mosquito_rate_per_m2: 12,
     min_recess_cm: 3,
     product_url: window.location.href,
@@ -287,6 +288,30 @@
     return el;
   }
 
+  function cleanText(s){ return s.replace(/\*\*/g, '').replace(/(^|[^\*])\*([^\*\s][^\*]*[^\*\s])\*/g, '$1$2'); }
+
+  let _audioCtx = null;
+  function playNotifSound(){
+    try {
+      _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if(_audioCtx.state === 'suspended') _audioCtx.resume();
+      const now = _audioCtx.currentTime;
+      const o = _audioCtx.createOscillator();
+      const g = _audioCtx.createGain();
+      o.connect(g); g.connect(_audioCtx.destination);
+      o.type = 'sine';
+      o.frequency.setValueAtTime(660, now);
+      o.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.08, now + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+      o.start(now); o.stop(now + 0.24);
+    } catch(e) {}
+  }
+
+  const THINK_MIN = 1800, THINK_PER_CHAR = 45, THINK_MAX = 8000;
+  function thinkMs(userText){ return Math.min(THINK_MAX, THINK_MIN + Math.max(0, userText.length) * THINK_PER_CHAR); }
+
   async function send(userText){
     if(!userText.trim()) return;
     suggestionsEl.style.display = 'none';
@@ -297,12 +322,14 @@
     sendBtn.disabled = true;
     const typingEl = addTyping();
     let botDiv = null;
+    const fetchPromise = fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation_id: conversationId, messages: history, product_context: productContext })
+    });
+    const thinkPromise = new Promise(r => setTimeout(r, thinkMs(userText)));
     try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: conversationId, messages: history, product_context: productContext })
-      });
+      const [res] = await Promise.all([fetchPromise, thinkPromise]);
       if(!res.ok || !res.body) throw new Error('Bad response ' + res.status);
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -312,9 +339,9 @@
         if(done) break;
         const chunk = decoder.decode(value, { stream: true });
         if(!chunk) continue;
-        if(!botDiv){ typingEl.remove(); botDiv = addMsg('bot', ''); }
+        if(!botDiv){ typingEl.remove(); botDiv = addMsg('bot', ''); playNotifSound(); }
         fullText += chunk;
-        botDiv.textContent = fullText;
+        botDiv.textContent = cleanText(fullText);
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
       history.push({ role: 'assistant', content: fullText });

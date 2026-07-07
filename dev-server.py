@@ -43,6 +43,10 @@ def mock_reply(text: str, ctx: dict) -> str:
     base_display = (ctx or {}).get("product_price_display") or fmt_price(base_price, currency)
     dim_match = re.search(r"(\d{2,3})\s*[x×]\s*(\d{2,3})", text or "")
 
+    # Check "do you measure FOR me" style questions FIRST so they don't fall into the how-to-measure branch
+    if re.search(r"do you measur|measure for me|measure it for us|come and measure|send someone|technician|fitter|installer|visit my home|come to my home|showroom|physical store|video call|come to us", lower):
+        return "We don't offer that, no measuring visits or fitters on our side. But the 3-point method is designed to make DIY measuring foolproof, and with our Free Fit Guarantee we replace it free if you get the size wrong. So zero risk to trying it yourself."
+
     if re.search(r"measur|meten|meting|hoe meet", lower):
         return "3-point method: measure width at top, middle, bottom and height at left, centre, right. Smallest wins. Measure to the millimetre, no rounding is really important. And if you measure wrong, our Free Fit Guarantee covers a free replacement.\nhttps://haloblinds.com/pages/measure"
 
@@ -53,7 +57,10 @@ def mock_reply(text: str, ctx: dict) -> str:
             surcharge = w_m * h_m * rate
             total = base_price + surcharge
             mosq_extra = w_m * h_m * mosq
-            return f"For a {w_cm}×{h_cm} cm window it comes to about {fmt_price(total, currency)}, with free worldwide shipping and taxes included. The optional mosquito screen adds about {fmt_price(mosq_extra, currency)} for this size."
+            return (f"For a {w_cm}×{h_cm} cm window it comes to about {fmt_price(total, currency)}, with free worldwide shipping and taxes included. "
+                    f"One thing though, for the best fit we measure to the millimetre, not just whole cm. Even a few mm off can let light sneak in around the edges. "
+                    f"Could you double-check the exact size (including any millimetres)? If it is tricky, our Free Fit Guarantee covers a free replacement anyway. "
+                    f"The optional mosquito screen would add about {fmt_price(mosq_extra, currency)} for this size.")
         return f"Starts at {base_display} for the smallest size (20×20 cm), plus {fmt_price(rate, currency)} per m² on top. Free worldwide shipping and taxes are included. What size is your window? Then I can give you the exact number."
 
     if re.search(r"deliver|ship|when|levertijd|verzending|versand", lower):
@@ -130,6 +137,9 @@ def mock_reply(text: str, ctx: dict) -> str:
 
     if re.search(r"^(hi|hello|hey|hoi|hallo|hai|hola|bonjour|guten|good\s(morn|even))", lower):
         return "Hey! Happy to help. What would you like to know about the Halo, sizing, colours, delivery, or something else?"
+
+    if re.search(r"do you measur|measure for me|measure it for us|come and measure|send someone|technician|fitter|installer|visit my home|come to my home|showroom|physical store|video call|come to us", lower):
+        return "We don't offer that, no measuring visits or fitters on our side. But the 3-point method is designed to make DIY measuring foolproof, and with our Free Fit Guarantee we replace it free if you get the size wrong. So zero risk to trying it yourself."
 
     return "For anything specific I can't answer here, drop us a line at help@haloblinds.com and we'll get back within 12 hours. Anything else I can help with?"
 
@@ -220,8 +230,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
 
-        # Simulate initial delay + streaming chunks (read-until-close, no chunked encoding)
-        time.sleep(0.35)
+        # Simulate a longer human "thinking" pause (matches widget's think delay)
+        _thinking = min(3.5, 1.6 + len(latest_user or "") * 0.04)
+        time.sleep(_thinking)
         i = 0
         while i < len(reply):
             step = min(random.randint(2, 5), len(reply) - i)
