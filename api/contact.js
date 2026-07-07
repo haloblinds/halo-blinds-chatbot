@@ -20,15 +20,35 @@ function getRedis() {
   return _redis;
 }
 
-// Send the email via Resend (https://resend.com) using their HTTP API.
-async function sendEmail({ name, email, message, product_title, product_url }) {
+// Post a message to the Resend API. Returns { ok, reason }.
+async function resendSend(apiKey, payload) {
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error("[halo-contact] resend error", res.status, body);
+      return { ok: false, reason: `resend_${res.status}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("[halo-contact] resend threw", e);
+    return { ok: false, reason: "resend_exception" };
+  }
+}
+
+// 1) Send the customer's message to the Halo team inbox.
+async function sendTeamEmail({ name, email, message, product_title, product_url }) {
   const apiKey = cleanEnv(process.env.RESEND_API_KEY);
   if (!apiKey) return { ok: false, reason: "no_api_key" };
 
   const to = cleanEnv(process.env.CONTACT_TO_EMAIL) || "help@haloblinds.com";
   const from = cleanEnv(process.env.CONTACT_FROM_EMAIL) || "Halo Contact <onboarding@resend.dev>";
 
-  const subject = `New question from Halo product page — ${name || "anonymous"}`;
+  const subject = `New question from Halo product page, ${name || "anonymous"}`;
   const text = [
     `New contact form submission from the Halo Blinds product page.`,
     ``,
@@ -40,7 +60,6 @@ async function sendEmail({ name, email, message, product_title, product_url }) {
     `Question:`,
     message || "(empty)",
     ``,
-    `---`,
     `Reply directly to this email and it goes back to the customer.`,
   ].join("\n");
 
@@ -53,32 +72,66 @@ async function sendEmail({ name, email, message, product_title, product_url }) {
     `<div style="font-family:system-ui,sans-serif;background:#f4f4f4;border-radius:8px;padding:12px 14px;white-space:pre-wrap;color:#111">${escapeHtml(message || "(empty)")}</div>` +
     `<p style="margin:16px 0 0;font-family:system-ui,sans-serif;color:#888;font-size:12px">Reply directly to this email and it will go straight back to the customer.</p>`;
 
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        reply_to: email || undefined,
-        subject,
-        text,
-        html,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      console.error("[halo-contact] resend error", res.status, body);
-      return { ok: false, reason: `resend_${res.status}` };
-    }
-    return { ok: true };
-  } catch (e) {
-    console.error("[halo-contact] resend threw", e);
-    return { ok: false, reason: "resend_exception" };
-  }
+  return resendSend(apiKey, {
+    from,
+    to: [to],
+    reply_to: email || undefined,
+    subject,
+    text,
+    html,
+  });
+}
+
+// 2) Send an auto-response confirmation to the customer.
+async function sendCustomerAutoResponse({ name, email, message }) {
+  const apiKey = cleanEnv(process.env.RESEND_API_KEY);
+  if (!apiKey) return { ok: false, reason: "no_api_key" };
+  if (!email) return { ok: false, reason: "no_email" };
+
+  const from = cleanEnv(process.env.AUTORESPONSE_FROM_EMAIL) || cleanEnv(process.env.CONTACT_FROM_EMAIL) || "Halo Blinds <onboarding@resend.dev>";
+  const replyTo = cleanEnv(process.env.CONTACT_TO_EMAIL) || "help@haloblinds.com";
+  const firstName = (name || "").split(/\s+/)[0] || "there";
+
+  const subject = `We got your question, Halo Blinds`;
+
+  const text = [
+    `Hi ${firstName},`,
+    ``,
+    `Thanks for reaching out! We received your question and one of the Halo team will personally get back to you within 12 hours, usually much sooner.`,
+    ``,
+    `Your question, for reference:`,
+    ``,
+    (message || "").split("\n").map((l) => `> ${l}`).join("\n"),
+    ``,
+    `If anything else comes up in the meantime, just reply to this email and it lands straight in our team inbox.`,
+    ``,
+    `Speak soon,`,
+    `The Halo Blinds team`,
+    ``,
+    `--`,
+    `This is an automated confirmation. A real person will reply shortly.`,
+  ].join("\n");
+
+  const html =
+    `<div style="font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.55;max-width:560px">` +
+      `<p style="margin:0 0 14px">Hi ${escapeHtml(firstName)},</p>` +
+      `<p style="margin:0 0 14px">Thanks for reaching out! We received your question and one of the Halo team will personally get back to you <strong>within 12 hours</strong>, usually much sooner.</p>` +
+      `<p style="margin:16px 0 8px;color:#666;font-size:13px">Your question, for reference:</p>` +
+      `<div style="background:#f4f4f4;border-left:3px solid #111;border-radius:6px;padding:12px 14px;white-space:pre-wrap;color:#111;font-size:14px">${escapeHtml(message || "")}</div>` +
+      `<p style="margin:20px 0 14px">If anything else comes up in the meantime, just reply to this email and it lands straight in our team inbox.</p>` +
+      `<p style="margin:0 0 4px">Speak soon,</p>` +
+      `<p style="margin:0 0 20px"><strong>The Halo Blinds team</strong></p>` +
+      `<p style="margin:0;color:#999;font-size:11px;border-top:1px solid #eee;padding-top:12px">This is an automated confirmation. A real person will reply shortly.</p>` +
+    `</div>`;
+
+  return resendSend(apiKey, {
+    from,
+    to: [email],
+    reply_to: replyTo,
+    subject,
+    text,
+    html,
+  });
 }
 
 function escapeHtml(s) {
@@ -129,8 +182,9 @@ export default async function handler(req) {
 
   // Send email (best effort) and log to Redis for the dashboard
   const now = Date.now();
-  const [emailResult] = await Promise.all([
-    sendEmail({ name, email, message, product_title, product_url }),
+  const [teamEmailResult, autoResponseResult] = await Promise.all([
+    sendTeamEmail({ name, email, message, product_title, product_url }),
+    sendCustomerAutoResponse({ name, email, message }),
     (async () => {
       try {
         const redis = getRedis();
@@ -160,7 +214,12 @@ export default async function handler(req) {
   // We treat the submission as successful for the user even if email sending is misconfigured,
   // because it's still logged in Redis and visible in the dashboard.
   return new Response(
-    JSON.stringify({ ok: true, email_sent: emailResult.ok, reason: emailResult.reason || null }),
+    JSON.stringify({
+      ok: true,
+      team_email_sent: teamEmailResult.ok,
+      auto_response_sent: autoResponseResult.ok,
+      reason: teamEmailResult.reason || autoResponseResult.reason || null,
+    }),
     { status: 200, headers: { "Content-Type": "application/json" } }
   );
 }

@@ -78,11 +78,17 @@
   .halo-submit:hover:not(:disabled){opacity:.9}
   .halo-submit:disabled{opacity:.5;cursor:not-allowed}
   .halo-privacy{font-size:11px;color:#888;text-align:center;margin-top:10px;line-height:1.4}
-  .halo-success{text-align:center;padding:20px 8px}
+  .halo-success{text-align:center;padding:20px 8px;display:none}
+  .halo-success.is-visible{display:block;animation:halo-msg-in .3s cubic-bezier(.22,1.35,.36,1)}
+  @keyframes halo-msg-in{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
   .halo-success-icon{width:56px;height:56px;background:#4ade80;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
   .halo-success-icon svg{width:28px;height:28px;color:#fff}
   .halo-success-title{font-size:16px;font-weight:600;color:#111;margin-bottom:6px}
-  .halo-success-body{font-size:14px;color:#555;line-height:1.5}
+  .halo-success-body{font-size:14px;color:#555;line-height:1.5;margin-bottom:18px}
+  .halo-send-another{display:inline-block;background:transparent;border:1px solid #111;color:#111;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s ease}
+  .halo-send-another:hover{background:#111;color:#fff}
+  .halo-form-view{display:block}
+  .halo-form-view.is-hidden{display:none}
   .halo-error{background:#fff5f5;border:1px solid #f5c2c2;color:#8b1a1a;font-size:13px;padding:10px 12px;border-radius:8px;margin-bottom:10px;display:none}
   .halo-error.is-visible{display:block}
   .halo-chat-teaser{position:fixed;right:24px;bottom:96px;background:#fff;border-radius:18px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:14px;color:#111;z-index:9996;max-width:280px;cursor:pointer;display:none;align-items:center;gap:10px;font-family:inherit;line-height:1.35;border:1px solid rgba(0,0,0,.05)}
@@ -157,29 +163,39 @@
       <img class="halo-header-avatar" src="https://cdn.shopify.com/s/files/1/1046/8307/7966/files/Titel_12.png?v=1783170226" alt="Halo">
     </div>
     <div>
-      <div class="halo-title">Halo</div>
+      <div class="halo-title">Halosupport</div>
       <div class="halo-sub">Usually replies within 12 hours</div>
     </div>
   </div>
   <div class="halo-chat-body" id="halo-chat-body">
-    <div class="halo-intro">Have a question about our blinds? Leave your details and we will reply within 12 hours.</div>
-    <div class="halo-error" id="halo-error"></div>
-    <form id="halo-contact-form" novalidate>
-      <div class="halo-form-field">
-        <label for="halo-input-name">Your name</label>
-        <input type="text" id="halo-input-name" name="name" placeholder="First name" autocomplete="given-name" required>
+    <div class="halo-form-view" id="halo-form-view">
+      <div class="halo-intro">Have a question about our blinds? Leave your details and we will reply within 12 hours.</div>
+      <div class="halo-error" id="halo-error"></div>
+      <form id="halo-contact-form" novalidate>
+        <div class="halo-form-field">
+          <label for="halo-input-name">Your name</label>
+          <input type="text" id="halo-input-name" name="name" placeholder="First name" autocomplete="given-name" required>
+        </div>
+        <div class="halo-form-field">
+          <label for="halo-input-email">Your email</label>
+          <input type="email" id="halo-input-email" name="email" placeholder="you@example.com" autocomplete="email" required>
+        </div>
+        <div class="halo-form-field">
+          <label for="halo-input-message">Your question</label>
+          <textarea id="halo-input-message" name="message" placeholder="What would you like to know? For example: measuring, colours, delivery to my country..." required></textarea>
+        </div>
+        <button type="submit" class="halo-submit" id="halo-submit">Send question</button>
+        <div class="halo-privacy">Your question goes directly to our team. You'll get a personal reply within 12 hours, usually much sooner.</div>
+      </form>
+    </div>
+    <div class="halo-success" id="halo-success-view">
+      <div class="halo-success-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
-      <div class="halo-form-field">
-        <label for="halo-input-email">Your email</label>
-        <input type="email" id="halo-input-email" name="email" placeholder="you@example.com" autocomplete="email" required>
-      </div>
-      <div class="halo-form-field">
-        <label for="halo-input-message">Your question</label>
-        <textarea id="halo-input-message" name="message" placeholder="What would you like to know? For example: measuring, colours, delivery to my country..." required></textarea>
-      </div>
-      <button type="submit" class="halo-submit" id="halo-submit">Send question</button>
-      <div class="halo-privacy">Goes straight to help@haloblinds.com. We reply within 12 hours.</div>
-    </form>
+      <div class="halo-success-title" id="halo-success-title">Thanks!</div>
+      <div class="halo-success-body" id="halo-success-body"></div>
+      <button type="button" class="halo-send-another" id="halo-send-another">Ask another question</button>
+    </div>
   </div>
 </div>
 
@@ -195,6 +211,11 @@
   var submitBtn = document.getElementById('halo-submit');
   var body = document.getElementById('halo-chat-body');
   var errorEl = document.getElementById('halo-error');
+  var formView = document.getElementById('halo-form-view');
+  var successView = document.getElementById('halo-success-view');
+  var successTitle = document.getElementById('halo-success-title');
+  var successBody = document.getElementById('halo-success-body');
+  var sendAnotherBtn = document.getElementById('halo-send-another');
 
   var productContext = {
     product_title: 'Halo Total Blackout Blind',
@@ -303,20 +324,29 @@
         throw new Error((data && data.error) || ('http_' + res.status));
       }
       playNotifSound();
-      body.innerHTML =
-        '<div class="halo-success">' +
-          '<div class="halo-success-icon">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
-          '</div>' +
-          '<div class="halo-success-title">Thanks, ' + escapeHtml(name) + '!</div>' +
-          '<div class="halo-success-body">We got your question and will reply to <strong>' + escapeHtml(email) + '</strong> within 12 hours.</div>' +
-        '</div>';
+      successTitle.textContent = 'Thanks, ' + name + '!';
+      successBody.innerHTML = 'We got your question and will reply to <strong>' + escapeHtml(email) + '</strong> within 12 hours. A confirmation is on its way to your inbox.';
+      formView.classList.add('is-hidden');
+      successView.classList.add('is-visible');
+      body.scrollTop = 0;
     } catch(err){
       console.error('[halo-contact]', err);
       showError('Something went wrong sending your message. Please email us directly at help@haloblinds.com.');
       submitBtn.disabled = false;
       submitBtn.textContent = 'Send question';
     }
+  });
+
+  sendAnotherBtn.addEventListener('click', function(){
+    nameInput.value = '';
+    emailInput.value = '';
+    messageInput.value = '';
+    hideError();
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Send question';
+    successView.classList.remove('is-visible');
+    formView.classList.remove('is-hidden');
+    setTimeout(function(){ nameInput.focus(); }, 100);
   });
 
   function escapeHtml(s){
