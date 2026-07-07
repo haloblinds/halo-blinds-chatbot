@@ -1,32 +1,26 @@
 {% comment %}
-  Halo Blinds, Product Page AI Chatbot
-  Paste this file's content into a Shopify snippet named `halo-chatbot`
-  (Online Store → Themes → Edit code → Snippets → Add snippet → halo-chatbot.liquid).
-  Then render it on the product page template with:
-    {% render 'halo-chatbot' %}
-  Or add a Custom Liquid block containing that render line.
+  Halo Blinds, on-page contact widget (no AI version).
+  Paste this into a Shopify snippet named `halo-chatbot`.
+  Render on product pages with: {% render 'halo-chatbot' %}
 
-  Config: set `api_url` below to your deployed Vercel URL.
+  How it works:
+  - A launcher bubble sits bottom-right on the product page.
+  - After 30 seconds a small teaser popup appears once per session.
+  - Clicking either opens a panel with a simple contact form (name, email, question).
+  - Submissions POST to the Vercel `/api/contact` endpoint.
+  - The Vercel function emails help@haloblinds.com and logs to the dashboard.
 {% endcomment %}
 
-{%- assign api_url = 'https://halo-blinds-chatbots.vercel.app/api/chat' -%}
+{%- assign api_url = 'https://halo-blinds-chatbots.vercel.app/api/contact' -%}
 {%- assign brand_name = 'Halo' -%}
-{%- assign brand_reply_time = 'Usually replies in a few minutes' -%}
+{%- assign brand_reply_time = 'Usually replies within 12 hours' -%}
 {%- assign avatar_url = 'https://cdn.shopify.com/s/files/1/1046/8307/7966/files/Titel_12.png?v=1783170226' -%}
-{%- assign teaser_delay_ms = 45000 -%}
+{%- assign teaser_delay_ms = 30000 -%}
 {%- assign teaser_message = 'Ask us, we are happy to help!' -%}
-{%- assign greeting_text = 'Hi there 👋 Ask us anything about the Halo blinds, measuring, colours, delivery, or fit. Happy to help!' -%}
-{%- comment -%}Pricing rates, SET THESE PER MARKET. Values are in shop currency (auto-adapts via Shopify Markets).{%- endcomment -%}
-{%- assign rate_per_m2 = 80 -%}
-{%- assign mosquito_rate_per_m2 = 12 -%}
-{%- comment -%}Message pacing: higher = more human "thinking" pause before reply.{%- endcomment -%}
-{%- assign think_min_ms = 1800 -%}
-{%- assign think_per_char_ms = 45 -%}
-{%- assign think_max_ms = 8000 -%}
-{%- assign min_recess_cm = 3 -%}
+{%- assign intro_text = 'Have a question about our blinds? Leave your details and we will reply within 12 hours.' -%}
 
 <style>
-  .halo-chat-launcher{position:fixed;right:20px;bottom:20px;width:60px;height:60px;border-radius:50%;background:#fff;border:none;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;z-index:9998;transition:transform .15s ease;font-family:inherit;padding:0;overflow:hidden;position:fixed}
+  .halo-chat-launcher{position:fixed;right:20px;bottom:20px;width:60px;height:60px;border-radius:50%;background:#fff;border:none;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;z-index:9998;transition:transform .15s ease;font-family:inherit;padding:0;overflow:hidden}
   .halo-chat-launcher:hover{transform:scale(1.05)}
   .halo-chat-launcher::after{content:'';position:absolute;top:4px;right:4px;width:12px;height:12px;background:#4ade80;border:2px solid #fff;border-radius:50%;z-index:2}
   .halo-launcher-avatar{width:100%;height:100%;object-fit:cover;border-radius:50%}
@@ -36,51 +30,44 @@
   .halo-chat-launcher.is-open::after{display:none}
   .halo-chat-launcher.is-open .halo-chat-close{display:flex}
 
-  .halo-chat-panel{position:fixed;right:20px;bottom:88px;width:380px;max-width:calc(100vw - 40px);height:560px;max-height:calc(100vh - 120px);background:#fff;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.16);display:none;flex-direction:column;overflow:hidden;z-index:9997;font-family:inherit;color:#111}
+  .halo-chat-panel{position:fixed;right:24px;bottom:96px;width:380px;max-width:calc(100vw - 48px);max-height:calc(100vh - 130px);background:#fff;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.16);display:none;flex-direction:column;overflow:hidden;z-index:9997;font-family:inherit;color:#111;animation:halo-panel-in .22s cubic-bezier(.22,1.1,.36,1)}
   .halo-chat-panel.is-open{display:flex}
+  @keyframes halo-panel-in{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
 
-  .halo-chat-header{padding:14px 16px;background:#111;color:#fff;display:flex;align-items:center;gap:12px}
+  .halo-chat-header{padding:14px 16px;background:#111;color:#fff;display:flex;align-items:center;gap:12px;flex-shrink:0}
   .halo-avatar-wrap{position:relative;flex-shrink:0}
   .halo-header-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#fff;display:block}
   .halo-avatar-wrap::after{content:'';position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;background:#4ade80;border:2px solid #111;border-radius:50%}
   .halo-chat-header .halo-title{font-weight:600;font-size:15px;letter-spacing:-.01em;line-height:1.2}
   .halo-chat-header .halo-sub{font-size:12px;opacity:.7;margin-top:3px}
 
-  .halo-chat-messages{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;background:#fafafa}
-  .halo-msg{max-width:85%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;word-wrap:break-word;white-space:pre-wrap;animation:halo-msg-in .28s cubic-bezier(.22,1.35,.36,1);transform-origin:bottom center}
-  .halo-msg.user{align-self:flex-end;background:#111;color:#fff;border-bottom-right-radius:4px;transform-origin:bottom right}
-  .halo-msg.bot{align-self:flex-start;background:#fff;color:#111;border:1px solid #eee;border-bottom-left-radius:4px;transform-origin:bottom left}
-  @keyframes halo-msg-in{from{opacity:0;transform:translateY(8px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}
-  .halo-typing{align-self:flex-start;background:#fff;color:#111;border:1px solid #eee;border-radius:14px;border-bottom-left-radius:4px;padding:14px 16px;display:inline-flex;gap:4px;align-items:center;animation:halo-msg-in .28s cubic-bezier(.22,1.35,.36,1);transform-origin:bottom left}
-  .halo-typing span{width:7px;height:7px;background:#bbb;border-radius:50%;display:inline-block;animation:halo-typing-bounce 1.3s ease-in-out infinite}
-  .halo-typing span:nth-child(2){animation-delay:.18s}
-  .halo-typing span:nth-child(3){animation-delay:.36s}
-  @keyframes halo-typing-bounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+  .halo-chat-body{padding:18px;background:#fafafa;overflow-y:auto;flex:1}
+  .halo-intro{font-size:14px;color:#333;line-height:1.5;margin-bottom:14px}
+  .halo-form-field{margin-bottom:10px}
+  .halo-form-field label{display:block;font-size:12px;color:#555;margin-bottom:4px;font-weight:500;letter-spacing:.01em}
+  .halo-form-field input,
+  .halo-form-field textarea{width:100%;border:1px solid #ddd;border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;background:#fff;transition:border-color .15s ease}
+  .halo-form-field input:focus,
+  .halo-form-field textarea:focus{border-color:#111}
+  .halo-form-field input.halo-err,
+  .halo-form-field textarea.halo-err{border-color:#e74c3c}
+  .halo-form-field textarea{min-height:96px;resize:vertical;line-height:1.4}
+  .halo-form-hint{font-size:11px;color:#888;margin-top:2px}
 
-  .halo-contact-form{background:#fff;border:1px solid #eee;border-radius:14px;padding:14px;margin:6px 0 4px;align-self:stretch;display:none;animation:halo-msg-in .3s cubic-bezier(.22,1.35,.36,1)}
-  .halo-contact-form.is-visible{display:block}
-  .halo-contact-title{font-weight:600;font-size:14px;margin-bottom:2px;color:#111}
-  .halo-contact-sub{font-size:12px;color:#666;margin-bottom:10px;line-height:1.4}
-  .halo-contact-form input{width:100%;border:1px solid #ddd;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;margin-bottom:6px;outline:none;box-sizing:border-box}
-  .halo-contact-form input:focus{border-color:#111}
-  .halo-contact-form input.halo-err{border-color:#e74c3c}
-  .halo-contact-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
-  .halo-contact-actions button{border:none;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit}
-  #halo-contact-skip{background:transparent;color:#666}
-  #halo-contact-skip:hover{color:#111}
-  #halo-contact-submit{background:#111;color:#fff}
-  #halo-contact-submit:hover{opacity:.85}
+  .halo-submit{width:100%;background:#111;color:#fff;border:none;padding:12px 16px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s ease;margin-top:4px}
+  .halo-submit:hover:not(:disabled){opacity:.9}
+  .halo-submit:disabled{opacity:.5;cursor:not-allowed}
 
-  .halo-chat-suggestions{padding:0 18px 12px;display:flex;flex-wrap:wrap;gap:6px;background:#fafafa}
-  .halo-chip{background:#fff;border:1px solid #ddd;color:#333;padding:6px 12px;border-radius:16px;font-size:12px;cursor:pointer;font-family:inherit;transition:background .1s ease}
-  .halo-chip:hover{background:#f0f0f0}
+  .halo-privacy{font-size:11px;color:#888;text-align:center;margin-top:10px;line-height:1.4}
 
-  .halo-chat-input{padding:12px 14px 14px;background:#fff;border-top:1px solid #eee;display:flex;gap:8px}
-  .halo-chat-input textarea{flex:1;border:1px solid #ddd;border-radius:20px;padding:10px 14px;font-size:14px;resize:none;font-family:inherit;outline:none;max-height:100px;line-height:1.4}
-  .halo-chat-input textarea:focus{border-color:#111}
-  .halo-chat-input button{background:#111;color:#fff;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:opacity .15s ease}
-  .halo-chat-input button:disabled{opacity:.4;cursor:not-allowed}
-  .halo-chat-input button svg{width:16px;height:16px}
+  .halo-success{text-align:center;padding:20px 8px}
+  .halo-success-icon{width:56px;height:56px;background:#4ade80;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+  .halo-success-icon svg{width:28px;height:28px;color:#fff}
+  .halo-success-title{font-size:16px;font-weight:600;color:#111;margin-bottom:6px}
+  .halo-success-body{font-size:14px;color:#555;line-height:1.5}
+
+  .halo-error{background:#fff5f5;border:1px solid #f5c2c2;color:#8b1a1a;font-size:13px;padding:10px 12px;border-radius:8px;margin-bottom:10px;display:none}
+  .halo-error.is-visible{display:block}
 
   .halo-chat-teaser{position:fixed;right:24px;bottom:96px;background:#fff;border-radius:18px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:14px;color:#111;z-index:9996;max-width:280px;cursor:pointer;display:none;align-items:center;gap:10px;font-family:inherit;line-height:1.35;border:1px solid rgba(0,0,0,.05)}
   .halo-chat-teaser.is-visible{display:flex;animation:halo-teaser-in .35s cubic-bezier(.22,1,.36,1)}
@@ -92,26 +79,26 @@
   .halo-chat-teaser-close:hover{background:#f4f4f4;color:#333}
 
   @media (max-width:480px){
-    .halo-chat-panel{right:10px;left:10px;width:auto;bottom:80px;height:calc(100vh - 100px)}
+    .halo-chat-panel{right:12px;left:12px;width:auto;bottom:88px;max-height:calc(100vh - 110px)}
     .halo-chat-launcher{right:14px;bottom:14px}
     .halo-chat-teaser{right:14px;bottom:82px;max-width:calc(100vw - 28px)}
   }
 </style>
 
-<div class="halo-chat-teaser" id="halo-chat-teaser" role="button" tabindex="0" aria-label="{{ teaser_message }}, open chat">
+<div class="halo-chat-teaser" id="halo-chat-teaser" role="button" tabindex="0" aria-label="{{ teaser_message }}, open contact form">
   <img class="halo-teaser-avatar" src="{{ avatar_url }}" alt="">
   <span class="halo-teaser-text">{{ teaser_message }}</span>
-  <button class="halo-chat-teaser-close" id="halo-chat-teaser-close" aria-label="Dismiss">×</button>
+  <button class="halo-chat-teaser-close" id="halo-chat-teaser-close" aria-label="Dismiss">&times;</button>
 </div>
 
-<button class="halo-chat-launcher" id="halo-chat-launcher" aria-label="Open chat">
+<button class="halo-chat-launcher" id="halo-chat-launcher" aria-label="Open contact form">
   <img class="halo-launcher-avatar" src="{{ avatar_url }}" alt="{{ brand_name }}">
   <span class="halo-chat-close" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
   </span>
 </button>
 
-<div class="halo-chat-panel" id="halo-chat-panel" role="dialog" aria-label="{{ brand_name }} Chat">
+<div class="halo-chat-panel" id="halo-chat-panel" role="dialog" aria-label="{{ brand_name }} Contact form">
   <div class="halo-chat-header">
     <div class="halo-avatar-wrap">
       <img class="halo-header-avatar" src="{{ avatar_url }}" alt="{{ brand_name }}">
@@ -122,210 +109,100 @@
     </div>
   </div>
 
-  <div class="halo-chat-messages" id="halo-chat-messages">
-    <div class="halo-msg bot">{{ greeting_text }}</div>
-    <div class="halo-contact-form" id="halo-contact-form">
-      <div class="halo-contact-title">Quick intro? 👋</div>
-      <div class="halo-contact-sub">Share your name and email so we can follow up if anything comes up later. Totally optional.</div>
-      <input type="text" id="halo-contact-name" placeholder="Your first name" autocomplete="given-name">
-      <input type="email" id="halo-contact-email" placeholder="Your email" autocomplete="email">
-      <div class="halo-contact-actions">
-        <button type="button" id="halo-contact-skip">Skip</button>
-        <button type="button" id="halo-contact-submit">Save</button>
+  <div class="halo-chat-body" id="halo-chat-body">
+    <div class="halo-intro">{{ intro_text }}</div>
+    <div class="halo-error" id="halo-error"></div>
+    <form id="halo-contact-form" novalidate>
+      <div class="halo-form-field">
+        <label for="halo-input-name">Your name</label>
+        <input type="text" id="halo-input-name" name="name" placeholder="First name" autocomplete="given-name" required>
       </div>
-    </div>
+      <div class="halo-form-field">
+        <label for="halo-input-email">Your email</label>
+        <input type="email" id="halo-input-email" name="email" placeholder="you@example.com" autocomplete="email" required>
+      </div>
+      <div class="halo-form-field">
+        <label for="halo-input-message">Your question</label>
+        <textarea id="halo-input-message" name="message" placeholder="What would you like to know? For example: measuring, colours, delivery to my country..." required></textarea>
+      </div>
+      <button type="submit" class="halo-submit" id="halo-submit">Send question</button>
+      <div class="halo-privacy">Goes straight to help@haloblinds.com. We reply within 12 hours.</div>
+    </form>
   </div>
-
-  <div class="halo-chat-suggestions" id="halo-chat-suggestions">
-    <button class="halo-chip" data-q="How do I measure my window?">How do I measure?</button>
-    <button class="halo-chip" data-q="How much does it cost for a 120x150 cm window?">Price for my size?</button>
-    <button class="halo-chip" data-q="When will my order be delivered?">Delivery time?</button>
-    <button class="halo-chip" data-q="Do the blinds block 100% of light?">100% blackout?</button>
-  </div>
-
-  <form class="halo-chat-input" id="halo-chat-form">
-    <textarea id="halo-chat-textarea" placeholder="Ask about sizing, colours, delivery..." rows="1" autocomplete="off"></textarea>
-    <button type="submit" id="halo-chat-send" aria-label="Send">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-    </button>
-  </form>
 </div>
 
 <script>
 (function(){
-  const API_URL = {{ api_url | json }};
-  const launcher = document.getElementById('halo-chat-launcher');
-  const panel = document.getElementById('halo-chat-panel');
-  const form = document.getElementById('halo-chat-form');
-  const textarea = document.getElementById('halo-chat-textarea');
-  const sendBtn = document.getElementById('halo-chat-send');
-  const messagesEl = document.getElementById('halo-chat-messages');
-  const suggestionsEl = document.getElementById('halo-chat-suggestions');
+  var API_URL = {{ api_url | json }};
+  var launcher = document.getElementById('halo-chat-launcher');
+  var panel = document.getElementById('halo-chat-panel');
+  var form = document.getElementById('halo-contact-form');
+  var nameInput = document.getElementById('halo-input-name');
+  var emailInput = document.getElementById('halo-input-email');
+  var messageInput = document.getElementById('halo-input-message');
+  var submitBtn = document.getElementById('halo-submit');
+  var body = document.getElementById('halo-chat-body');
+  var errorEl = document.getElementById('halo-error');
 
-  // Persistent conversation ID for this browser session
-  let conversationId = sessionStorage.getItem('halo_conv_id');
-  if(!conversationId){
-    conversationId = 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
-    sessionStorage.setItem('halo_conv_id', conversationId);
-  }
-
-  // Full conversation history sent on every request
-  const history = [];
-
-  // Product context, snapshotted from the current Shopify product.
-  // Prices are in the SHOPPER'S currency (auto-set by Shopify Markets).
-  // The bot uses these values directly so all price answers are in the right currency.
-  const productContext = {
+  var productContext = {
     product_title: {{ product.title | default: '' | json }},
-    product_type: {{ product.type | default: '' | json }},
-    product_vendor: {{ product.vendor | default: '' | json }},
     product_price_display: {{ product.price | default: 0 | money | json }},
-    product_compare_at_display: {{ product.compare_at_price | default: 0 | money | json }},
-    product_price_number: {{ product.price | default: 0 | money_without_currency | json }},
-    currency_code: {{ shop.currency | default: 'EUR' | json }},
-    rate_per_m2: {{ rate_per_m2 }},
-    mosquito_rate_per_m2: {{ mosquito_rate_per_m2 }},
-    min_recess_cm: {{ min_recess_cm }},
     product_url: {{ product.url | default: '' | json }},
     page_url: window.location.href
   };
 
-  function toggle(){
-    const open = panel.classList.toggle('is-open');
+  function togglePanel(){
+    var open = panel.classList.toggle('is-open');
     launcher.classList.toggle('is-open', open);
-    if(open){
+    if (open){
       hideTeaser();
-      chatOpenedOnce = true;
-      setTimeout(()=> textarea.focus(), 80);
+      setTimeout(function(){ nameInput.focus(); }, 80);
     }
   }
-  launcher.addEventListener('click', toggle);
+  launcher.addEventListener('click', togglePanel);
 
-  // ---- Teaser popup: shows after a delay, once per session, if chat not yet opened ----
-  const teaser = document.getElementById('halo-chat-teaser');
-  const teaserClose = document.getElementById('halo-chat-teaser-close');
-  const TEASER_DELAY = {{ teaser_delay_ms }};
-  const TEASER_KEY = 'halo_teaser_dismissed';
-  let chatOpenedOnce = false;
+  // Teaser popup: shows after delay, once per session, only if panel not yet opened
+  var teaser = document.getElementById('halo-chat-teaser');
+  var teaserClose = document.getElementById('halo-chat-teaser-close');
+  var TEASER_KEY = 'halo_teaser_dismissed';
+  var panelOpenedOnce = false;
 
   function hideTeaser(){ teaser.classList.remove('is-visible'); }
   function dismissTeaser(){
     hideTeaser();
     try { sessionStorage.setItem(TEASER_KEY, '1'); } catch(e){}
   }
-
   teaser.addEventListener('click', function(e){
-    if(e.target.closest('.halo-chat-teaser-close')) return;
+    if (e.target.closest('.halo-chat-teaser-close')) return;
     dismissTeaser();
-    if(!panel.classList.contains('is-open')) toggle();
+    if (!panel.classList.contains('is-open')) togglePanel();
   });
   teaser.addEventListener('keydown', function(e){
-    if(e.key === 'Enter' || e.key === ' '){
+    if (e.key === 'Enter' || e.key === ' '){
       e.preventDefault();
       dismissTeaser();
-      if(!panel.classList.contains('is-open')) toggle();
+      if (!panel.classList.contains('is-open')) togglePanel();
     }
   });
   teaserClose.addEventListener('click', function(e){
     e.stopPropagation();
     dismissTeaser();
   });
-
   setTimeout(function(){
-    if(chatOpenedOnce) return;
-    try { if(sessionStorage.getItem(TEASER_KEY)) return; } catch(e){}
+    if (panelOpenedOnce) return;
+    try { if (sessionStorage.getItem(TEASER_KEY)) return; } catch(e){}
     teaser.classList.add('is-visible');
-  }, TEASER_DELAY);
+  }, {{ teaser_delay_ms }});
 
-  function addMsg(role, text){
-    const div = document.createElement('div');
-    div.className = 'halo-msg ' + role;
-    div.textContent = text;
-    messagesEl.appendChild(div);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    return div;
-  }
-
-  suggestionsEl.addEventListener('click', function(e){
-    const btn = e.target.closest('.halo-chip');
-    if(!btn) return;
-    textarea.value = btn.dataset.q;
-    form.requestSubmit();
-  });
-
-  textarea.addEventListener('input', function(){
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
-  });
-
-  textarea.addEventListener('keydown', function(e){
-    if(e.key === 'Enter' && !e.shiftKey){
-      e.preventDefault();
-      form.requestSubmit();
-    }
-  });
-
-  function addTyping(){
-    const el = document.createElement('div');
-    el.className = 'halo-typing';
-    el.innerHTML = '<span></span><span></span><span></span>';
-    messagesEl.appendChild(el);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    return el;
-  }
-
-  // Strip any markdown asterisks that Claude might slip in.
-  function cleanText(s){ return s.replace(/\*\*/g, '').replace(/(^|[^\*])\*([^\*\s][^\*]*[^\*\s])\*/g, '$1$2'); }
-
-  // Contact form: shows after first bot reply, captured name/email is sent as product_context so Claude can use it.
-  const contactForm = document.getElementById('halo-contact-form');
-  const contactSkip = document.getElementById('halo-contact-skip');
-  const contactSubmit = document.getElementById('halo-contact-submit');
-  const contactNameInput = document.getElementById('halo-contact-name');
-  const contactEmailInput = document.getElementById('halo-contact-email');
-  const CONTACT_KEY = 'halo_contact_state';
-  let contactState = null;
-  try { contactState = JSON.parse(sessionStorage.getItem(CONTACT_KEY) || 'null'); } catch(e){}
-  if (contactState && contactState.name) productContext.contact_name = contactState.name;
-  if (contactState && contactState.email) productContext.contact_email = contactState.email;
-
-  function showContactForm(){
-    if (contactState) return;
-    // Move the form to the end of the messages list so it appears after the latest bot reply
-    messagesEl.appendChild(contactForm);
-    contactForm.classList.add('is-visible');
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-  function saveContactState(state){
-    contactState = state;
-    try { sessionStorage.setItem(CONTACT_KEY, JSON.stringify(state)); } catch(e){}
-    contactForm.classList.remove('is-visible');
-  }
-  contactSkip.addEventListener('click', function(){ saveContactState({ skipped: true }); });
-  contactSubmit.addEventListener('click', function(){
-    const name = (contactNameInput.value || '').trim();
-    const email = (contactEmailInput.value || '').trim();
-    const emailOk = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!name && !email) { saveContactState({ skipped: true }); return; }
-    if (!emailOk) { contactEmailInput.classList.add('halo-err'); return; }
-    contactEmailInput.classList.remove('halo-err');
-    saveContactState({ name, email });
-    if (name) productContext.contact_name = name;
-    if (email) productContext.contact_email = email;
-    addMsg('bot', name ? ("Thanks " + name + "! I'll keep helping.") : "Thanks! Anything else about the Halo?");
-    playNotifSound();
-  });
-  contactEmailInput.addEventListener('input', function(){ contactEmailInput.classList.remove('halo-err'); });
-
-  // Subtle WhatsApp-like "pop" for incoming bot messages (Web Audio API, no external file).
-  let _audioCtx = null;
+  // Subtle notification sound on submit success
+  var _audioCtx = null;
   function playNotifSound(){
     try {
       _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      if(_audioCtx.state === 'suspended') _audioCtx.resume();
-      const now = _audioCtx.currentTime;
-      const o = _audioCtx.createOscillator();
-      const g = _audioCtx.createGain();
+      if (_audioCtx.state === 'suspended') _audioCtx.resume();
+      var now = _audioCtx.currentTime;
+      var o = _audioCtx.createOscillator();
+      var g = _audioCtx.createGain();
       o.connect(g); g.connect(_audioCtx.destination);
       o.type = 'sine';
       o.frequency.setValueAtTime(660, now);
@@ -334,111 +211,68 @@
       g.gain.linearRampToValueAtTime(0.08, now + 0.015);
       g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
       o.start(now); o.stop(now + 0.24);
-    } catch(e) {}
+    } catch(e){}
   }
 
-  const THINK_MIN = {{ think_min_ms }};
-  const THINK_PER_CHAR = {{ think_per_char_ms }};
-  const THINK_MAX = {{ think_max_ms }};
-  function thinkMs(userText){
-    return Math.min(THINK_MAX, THINK_MIN + Math.max(0, userText.length) * THINK_PER_CHAR);
+  function isValidEmail(s){
+    return typeof s === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) && s.length <= 254;
   }
-
-  // Track whether we've received at least one bot reply (to trigger the contact form once)
-  let firstBotReplyDone = false;
-
-  async function send(userText){
-    if(!userText.trim()) return;
-    suggestionsEl.style.display = 'none';
-    addMsg('user', userText);
-    history.push({ role: 'user', content: userText });
-    textarea.value = '';
-    textarea.style.height = 'auto';
-    sendBtn.disabled = true;
-
-    const typingEl = addTyping();
-    let botDiv = null;
-
-    const fetchPromise = fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        conversation_id: conversationId,
-        messages: history,
-        product_context: productContext
-      })
-    });
-    const thinkPromise = new Promise(r => setTimeout(r, thinkMs(userText)));
-
-    // Typewriter buffer for smooth character-by-character rendering
-    let fullText = '';       // everything received so far from the stream
-    let displayLen = 0;      // how many chars are currently visible
-    let revealTimer = null;
-    const CHAR_INTERVAL_MS = 16;
-    function startReveal(){
-      if (revealTimer) return;
-      revealTimer = setInterval(function(){
-        if (!botDiv) return;
-        if (displayLen >= fullText.length) return;
-        // Reveal 1-3 chars per tick for a natural feel
-        const step = Math.min(3, fullText.length - displayLen);
-        displayLen += step;
-        botDiv.textContent = cleanText(fullText.slice(0, displayLen));
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      }, CHAR_INTERVAL_MS);
-    }
-    function stopReveal(){
-      if (revealTimer) { clearInterval(revealTimer); revealTimer = null; }
-    }
-
-    try {
-      const [res] = await Promise.all([fetchPromise, thinkPromise]);
-      if(!res.ok || !res.body){
-        throw new Error('Bad response ' + res.status);
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      while(true){
-        const { done, value } = await reader.read();
-        if(done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        if(!chunk) continue;
-        if(!botDiv){
-          typingEl.remove();
-          botDiv = addMsg('bot', '');
-          playNotifSound();
-          startReveal();
-        }
-        fullText += chunk;
-      }
-      // Wait for the reveal to catch up to the fully-received text
-      await new Promise(function(resolve){
-        const check = setInterval(function(){
-          if (displayLen >= fullText.length) { clearInterval(check); stopReveal(); resolve(); }
-        }, 30);
-      });
-      history.push({ role: 'assistant', content: fullText });
-
-      // After the first bot reply, show the contact form (once per session)
-      if (!firstBotReplyDone) {
-        firstBotReplyDone = true;
-        setTimeout(showContactForm, 400);
-      }
-    } catch(err){
-      stopReveal();
-      typingEl.remove();
-      addMsg('bot', "Sorry, something went wrong on our side. Please email help@haloblinds.com or try again in a moment.");
-      console.error('[halo-chat]', err);
-    } finally {
-      sendBtn.disabled = false;
-      textarea.focus();
-    }
+  function showError(msg){
+    errorEl.textContent = msg;
+    errorEl.classList.add('is-visible');
   }
-
-  form.addEventListener('submit', function(e){
-    e.preventDefault();
-    send(textarea.value);
+  function hideError(){
+    errorEl.classList.remove('is-visible');
+    errorEl.textContent = '';
+  }
+  [nameInput, emailInput, messageInput].forEach(function(el){
+    el.addEventListener('input', function(){ el.classList.remove('halo-err'); hideError(); });
   });
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    var name = (nameInput.value || '').trim();
+    var email = (emailInput.value || '').trim();
+    var message = (messageInput.value || '').trim();
+    var hasErr = false;
+    if (!name){ nameInput.classList.add('halo-err'); hasErr = true; }
+    if (!isValidEmail(email)){ emailInput.classList.add('halo-err'); hasErr = true; }
+    if (!message || message.length < 2){ messageInput.classList.add('halo-err'); hasErr = true; }
+    if (hasErr){ showError('Please fill in your name, a valid email, and your question.'); return; }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending...';
+    hideError();
+    try {
+      var res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, email: email, message: message, product_context: productContext })
+      });
+      var data = null;
+      try { data = await res.json(); } catch(_){}
+      if (!res.ok || !data || data.ok !== true){
+        throw new Error((data && data.error) || ('http_' + res.status));
+      }
+      playNotifSound();
+      body.innerHTML =
+        '<div class="halo-success">' +
+          '<div class="halo-success-icon">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+          '</div>' +
+          '<div class="halo-success-title">Thanks, ' + escapeHtml(name) + '!</div>' +
+          '<div class="halo-success-body">We got your question and will reply to <strong>' + escapeHtml(email) + '</strong> within 12 hours.</div>' +
+        '</div>';
+    } catch(err){
+      console.error('[halo-contact]', err);
+      showError('Something went wrong sending your message. Please email us directly at help@haloblinds.com.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send question';
+    }
+  });
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+  }
 })();
 </script>

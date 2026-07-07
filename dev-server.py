@@ -168,7 +168,59 @@ class Handler(http.server.BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/chat":
             return self.handle_chat()
+        if parsed.path == "/api/contact":
+            return self.handle_contact()
         self.send_error(404, "Not found")
+
+    def handle_contact(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(length)
+        try:
+            payload = json.loads(raw or b"{}")
+        except json.JSONDecodeError:
+            return self._json(400, {"ok": False, "error": "bad_json"})
+
+        name = (payload.get("name") or "").strip()[:120]
+        email = (payload.get("email") or "").strip()[:254]
+        message = (payload.get("message") or "").strip()[:4000]
+        ctx = payload.get("product_context") or {}
+        product_title = (ctx.get("product_title") or "")[:240]
+        product_url = (ctx.get("page_url") or ctx.get("product_url") or "")[:1000]
+
+        email_re = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+        if not email or not email_re.match(email):
+            return self._json(400, {"ok": False, "error": "invalid_email"})
+        if not message or len(message) < 2:
+            return self._json(400, {"ok": False, "error": "empty_message"})
+
+        now = int(time.time() * 1000)
+        req_id = f"req_{now}_{random.randint(1000, 9999)}"
+        # Store in the same shape as production so the dashboard can display it
+        CONVERSATIONS[req_id] = {
+            "id": req_id,
+            "updated_at": now,
+            "product_title": product_title or "Halo Total Blackout Blind",
+            "product_url": product_url,
+            "messages": [{"role": "user", "content": f"{name} <{email}>\n\n{message}", "at": now}],
+        }
+        QUESTIONS.insert(0, {"q": message, "at": now, "conversation_id": req_id})
+        del QUESTIONS[500:]
+        # Log mock "email" to stdout so you can see what would have been sent in production
+        print(f"\n  [MOCK EMAIL] To: help@haloblinds.com  Reply-To: {email}")
+        print(f"  Name: {name}\n  Question: {message[:120]}...\n")
+        # Simulate a short server thinking pause
+        time.sleep(0.6)
+        return self._json(200, {"ok": True, "email_sent": False, "reason": "mock_mode"})
+
+    def _json(self, status, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(status)
+        self._cors()
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _cors(self):
         origin = self.headers.get("Origin", "*")

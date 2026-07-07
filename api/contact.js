@@ -1,0 +1,187 @@
+import { Redis } from "@upstash/redis";
+
+export const config = { runtime: "edge" };
+
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim().replace(/^["'](.*)["']$/, "$1").trim())
+  .filter(Boolean);
+
+function cleanEnv(v) {
+  if (!v) return v;
+  return v.trim().replace(/^["'](.*)["']$/, "$1").trim();
+}
+
+function corsHeaders(origin) {
+  let allowed = "*";
+  if (ALLOWED_ORIGINS.length === 0) {
+    allowed = origin || "*";
+  } else if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    allowed = origin;
+  } else if (ALLOWED_ORIGINS[0]) {
+    allowed = ALLOWED_ORIGINS[0];
+  }
+  if (typeof allowed !== "string" || /[\r\n\t\0]/.test(allowed)) allowed = "*";
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    Vary: "Origin",
+  };
+}
+
+let _redis = null;
+function getRedis() {
+  if (!_redis) {
+    const url = cleanEnv(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL);
+    const token = cleanEnv(process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN);
+    if (!url || !token) throw new Error("Missing Upstash env vars");
+    _redis = new Redis({ url, token });
+  }
+  return _redis;
+}
+
+// Send the email via Resend (https://resend.com) using their HTTP API.
+async function sendEmail({ name, email, message, product_title, product_url }) {
+  const apiKey = cleanEnv(process.env.RESEND_API_KEY);
+  if (!apiKey) return { ok: false, reason: "no_api_key" };
+
+  const to = cleanEnv(process.env.CONTACT_TO_EMAIL) || "help@haloblinds.com";
+  const from = cleanEnv(process.env.CONTACT_FROM_EMAIL) || "Halo Contact <onboarding@resend.dev>";
+
+  const subject = `New question from Halo product page — ${name || "anonymous"}`;
+  const text = [
+    `New contact form submission from the Halo Blinds product page.`,
+    ``,
+    `Name:    ${name || "(not provided)"}`,
+    `Email:   ${email || "(not provided)"}`,
+    `Product: ${product_title || "(not provided)"}`,
+    `Page:    ${product_url || "(not provided)"}`,
+    ``,
+    `Question:`,
+    message || "(empty)",
+    ``,
+    `---`,
+    `Reply directly to this email and it goes back to the customer.`,
+  ].join("\n");
+
+  const html =
+    `<h2 style="margin:0 0 8px;font-family:system-ui,sans-serif">New question from the Halo product page</h2>` +
+    `<p style="margin:0 0 6px;font-family:system-ui,sans-serif;color:#333"><strong>Name:</strong> ${escapeHtml(name || "(not provided)")}</p>` +
+    `<p style="margin:0 0 6px;font-family:system-ui,sans-serif;color:#333"><strong>Email:</strong> ${escapeHtml(email || "(not provided)")}</p>` +
+    `<p style="margin:0 0 6px;font-family:system-ui,sans-serif;color:#333"><strong>Product:</strong> ${escapeHtml(product_title || "(not provided)")}</p>` +
+    `<p style="margin:0 0 12px;font-family:system-ui,sans-serif;color:#333"><strong>Page:</strong> <a href="${escapeAttr(product_url || "#")}">${escapeHtml(product_url || "(not provided)")}</a></p>` +
+    `<div style="font-family:system-ui,sans-serif;background:#f4f4f4;border-radius:8px;padding:12px 14px;white-space:pre-wrap;color:#111">${escapeHtml(message || "(empty)")}</div>` +
+    `<p style="margin:16px 0 0;font-family:system-ui,sans-serif;color:#888;font-size:12px">Reply directly to this email and it will go straight back to the customer.</p>`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        reply_to: email || undefined,
+        subject,
+        text,
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error("[halo-contact] resend error", res.status, body);
+      return { ok: false, reason: `resend_${res.status}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("[halo-contact] resend threw", e);
+    return { ok: false, reason: "resend_exception" };
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/`/g, "&#96;");
+}
+
+function isValidEmail(s) {
+  return typeof s === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) && s.length <= 254;
+}
+
+export default async function handler(req) {
+  const origin = req.headers.get("origin") || "";
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: corsHeaders(origin) });
+
+  let payload;
+  try {
+    payload = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ ok: false, error: "bad_json" }), {
+      status: 400,
+      headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+    });
+  }
+
+  const name = String(payload?.name || "").slice(0, 120).trim();
+  const email = String(payload?.email || "").slice(0, 254).trim();
+  const message = String(payload?.message || "").slice(0, 4000).trim();
+  const product_context = payload?.product_context || {};
+  const product_title = String(product_context.product_title || "").slice(0, 240);
+  const product_url = String(product_context.page_url || product_context.product_url || "").slice(0, 1000);
+
+  if (!isValidEmail(email)) {
+    return new Response(JSON.stringify({ ok: false, error: "invalid_email" }), {
+      status: 400,
+      headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+    });
+  }
+  if (!message || message.length < 2) {
+    return new Response(JSON.stringify({ ok: false, error: "empty_message" }), {
+      status: 400,
+      headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+    });
+  }
+
+  // Send email (best effort) and log to Redis for the dashboard
+  const now = Date.now();
+  const [emailResult] = await Promise.all([
+    sendEmail({ name, email, message, product_title, product_url }),
+    (async () => {
+      try {
+        const redis = getRedis();
+        const id = `req_${now}_${Math.random().toString(36).slice(2, 8)}`;
+        const entry = { id, name, email, message, product_title, product_url, at: now };
+        await redis.lpush("halo:contact_requests", JSON.stringify(entry));
+        await redis.ltrim("halo:contact_requests", 0, 999);
+        // Also store in the "conversations" shape so the existing dashboard shows them
+        await redis.zadd("halo:conversations", { score: now, member: id });
+        await redis.hset(`halo:conv:${id}`, {
+          updated_at: now,
+          product_url,
+          product_title,
+        });
+        await redis.rpush(
+          `halo:conv:${id}:messages`,
+          JSON.stringify({ role: "user", content: `${name} <${email}>\n\n${message}`, at: now })
+        );
+        await redis.expire(`halo:conv:${id}`, 60 * 60 * 24 * 90);
+        await redis.expire(`halo:conv:${id}:messages`, 60 * 60 * 24 * 90);
+      } catch (e) {
+        console.error("[halo-contact] redis log failed", e);
+      }
+    })(),
+  ]);
+
+  // We treat the submission as successful for the user even if email sending is misconfigured,
+  // because it's still logged in Redis and visible in the dashboard.
+  return new Response(
+    JSON.stringify({ ok: true, email_sent: emailResult.ok, reason: emailResult.reason || null }),
+    { status: 200, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } }
+  );
+}
