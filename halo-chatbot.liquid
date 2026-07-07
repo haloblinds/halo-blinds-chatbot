@@ -57,6 +57,20 @@
   .halo-typing span:nth-child(3){animation-delay:.36s}
   @keyframes halo-typing-bounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
 
+  .halo-contact-form{background:#fff;border:1px solid #eee;border-radius:14px;padding:14px;margin:6px 0 4px;align-self:stretch;display:none;animation:halo-msg-in .3s cubic-bezier(.22,1.35,.36,1)}
+  .halo-contact-form.is-visible{display:block}
+  .halo-contact-title{font-weight:600;font-size:14px;margin-bottom:2px;color:#111}
+  .halo-contact-sub{font-size:12px;color:#666;margin-bottom:10px;line-height:1.4}
+  .halo-contact-form input{width:100%;border:1px solid #ddd;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;margin-bottom:6px;outline:none;box-sizing:border-box}
+  .halo-contact-form input:focus{border-color:#111}
+  .halo-contact-form input.halo-err{border-color:#e74c3c}
+  .halo-contact-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+  .halo-contact-actions button{border:none;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit}
+  #halo-contact-skip{background:transparent;color:#666}
+  #halo-contact-skip:hover{color:#111}
+  #halo-contact-submit{background:#111;color:#fff}
+  #halo-contact-submit:hover{opacity:.85}
+
   .halo-chat-suggestions{padding:0 18px 12px;display:flex;flex-wrap:wrap;gap:6px;background:#fafafa}
   .halo-chip{background:#fff;border:1px solid #ddd;color:#333;padding:6px 12px;border-radius:16px;font-size:12px;cursor:pointer;font-family:inherit;transition:background .1s ease}
   .halo-chip:hover{background:#f0f0f0}
@@ -110,6 +124,16 @@
 
   <div class="halo-chat-messages" id="halo-chat-messages">
     <div class="halo-msg bot">{{ greeting_text }}</div>
+    <div class="halo-contact-form" id="halo-contact-form">
+      <div class="halo-contact-title">Quick intro? 👋</div>
+      <div class="halo-contact-sub">Share your name and email so we can follow up if anything comes up later. Totally optional.</div>
+      <input type="text" id="halo-contact-name" placeholder="Your first name" autocomplete="given-name">
+      <input type="email" id="halo-contact-email" placeholder="Your email" autocomplete="email">
+      <div class="halo-contact-actions">
+        <button type="button" id="halo-contact-skip">Skip</button>
+        <button type="button" id="halo-contact-submit">Save</button>
+      </div>
+    </div>
   </div>
 
   <div class="halo-chat-suggestions" id="halo-chat-suggestions">
@@ -253,6 +277,46 @@
   // Strip any markdown asterisks that Claude might slip in.
   function cleanText(s){ return s.replace(/\*\*/g, '').replace(/(^|[^\*])\*([^\*\s][^\*]*[^\*\s])\*/g, '$1$2'); }
 
+  // Contact form: shows after first bot reply, captured name/email is sent as product_context so Claude can use it.
+  const contactForm = document.getElementById('halo-contact-form');
+  const contactSkip = document.getElementById('halo-contact-skip');
+  const contactSubmit = document.getElementById('halo-contact-submit');
+  const contactNameInput = document.getElementById('halo-contact-name');
+  const contactEmailInput = document.getElementById('halo-contact-email');
+  const CONTACT_KEY = 'halo_contact_state';
+  let contactState = null;
+  try { contactState = JSON.parse(sessionStorage.getItem(CONTACT_KEY) || 'null'); } catch(e){}
+  if (contactState && contactState.name) productContext.contact_name = contactState.name;
+  if (contactState && contactState.email) productContext.contact_email = contactState.email;
+
+  function showContactForm(){
+    if (contactState) return;
+    // Move the form to the end of the messages list so it appears after the latest bot reply
+    messagesEl.appendChild(contactForm);
+    contactForm.classList.add('is-visible');
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  function saveContactState(state){
+    contactState = state;
+    try { sessionStorage.setItem(CONTACT_KEY, JSON.stringify(state)); } catch(e){}
+    contactForm.classList.remove('is-visible');
+  }
+  contactSkip.addEventListener('click', function(){ saveContactState({ skipped: true }); });
+  contactSubmit.addEventListener('click', function(){
+    const name = (contactNameInput.value || '').trim();
+    const email = (contactEmailInput.value || '').trim();
+    const emailOk = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!name && !email) { saveContactState({ skipped: true }); return; }
+    if (!emailOk) { contactEmailInput.classList.add('halo-err'); return; }
+    contactEmailInput.classList.remove('halo-err');
+    saveContactState({ name, email });
+    if (name) productContext.contact_name = name;
+    if (email) productContext.contact_email = email;
+    addMsg('bot', name ? ("Thanks " + name + "! I'll keep helping.") : "Thanks! Anything else about the Halo?");
+    playNotifSound();
+  });
+  contactEmailInput.addEventListener('input', function(){ contactEmailInput.classList.remove('halo-err'); });
+
   // Subtle WhatsApp-like "pop" for incoming bot messages (Web Audio API, no external file).
   let _audioCtx = null;
   function playNotifSound(){
@@ -280,6 +344,9 @@
     return Math.min(THINK_MAX, THINK_MIN + Math.max(0, userText.length) * THINK_PER_CHAR);
   }
 
+  // Track whether we've received at least one bot reply (to trigger the contact form once)
+  let firstBotReplyDone = false;
+
   async function send(userText){
     if(!userText.trim()) return;
     suggestionsEl.style.display = 'none';
@@ -292,7 +359,6 @@
     const typingEl = addTyping();
     let botDiv = null;
 
-    // Start the fetch AND a "thinking" delay in parallel. Whichever finishes last gates the reply.
     const fetchPromise = fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -304,6 +370,27 @@
     });
     const thinkPromise = new Promise(r => setTimeout(r, thinkMs(userText)));
 
+    // Typewriter buffer for smooth character-by-character rendering
+    let fullText = '';       // everything received so far from the stream
+    let displayLen = 0;      // how many chars are currently visible
+    let revealTimer = null;
+    const CHAR_INTERVAL_MS = 16;
+    function startReveal(){
+      if (revealTimer) return;
+      revealTimer = setInterval(function(){
+        if (!botDiv) return;
+        if (displayLen >= fullText.length) return;
+        // Reveal 1-3 chars per tick for a natural feel
+        const step = Math.min(3, fullText.length - displayLen);
+        displayLen += step;
+        botDiv.textContent = cleanText(fullText.slice(0, displayLen));
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }, CHAR_INTERVAL_MS);
+    }
+    function stopReveal(){
+      if (revealTimer) { clearInterval(revealTimer); revealTimer = null; }
+    }
+
     try {
       const [res] = await Promise.all([fetchPromise, thinkPromise]);
       if(!res.ok || !res.body){
@@ -312,19 +399,34 @@
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let fullText = '';
       while(true){
         const { done, value } = await reader.read();
         if(done) break;
         const chunk = decoder.decode(value, { stream: true });
         if(!chunk) continue;
-        if(!botDiv){ typingEl.remove(); botDiv = addMsg('bot', ''); playNotifSound(); }
+        if(!botDiv){
+          typingEl.remove();
+          botDiv = addMsg('bot', '');
+          playNotifSound();
+          startReveal();
+        }
         fullText += chunk;
-        botDiv.textContent = cleanText(fullText);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
       }
+      // Wait for the reveal to catch up to the fully-received text
+      await new Promise(function(resolve){
+        const check = setInterval(function(){
+          if (displayLen >= fullText.length) { clearInterval(check); stopReveal(); resolve(); }
+        }, 30);
+      });
       history.push({ role: 'assistant', content: fullText });
+
+      // After the first bot reply, show the contact form (once per session)
+      if (!firstBotReplyDone) {
+        firstBotReplyDone = true;
+        setTimeout(showContactForm, 400);
+      }
     } catch(err){
+      stopReveal();
       typingEl.remove();
       addMsg('bot', "Sorry, something went wrong on our side. Please email help@haloblinds.com or try again in a moment.");
       console.error('[halo-chat]', err);
