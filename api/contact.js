@@ -182,9 +182,8 @@ export default async function handler(req) {
 
   // Send email (best effort) and log to Redis for the dashboard
   const now = Date.now();
-  const [teamEmailResult, autoResponseResult] = await Promise.all([
+  const [teamEmailResult] = await Promise.all([
     sendTeamEmail({ name, email, message, product_title, product_url }),
-    sendCustomerAutoResponse({ name, email, message }),
     (async () => {
       try {
         const redis = getRedis();
@@ -217,8 +216,7 @@ export default async function handler(req) {
     JSON.stringify({
       ok: true,
       team_email_sent: teamEmailResult.ok,
-      auto_response_sent: autoResponseResult.ok,
-      reason: teamEmailResult.reason || autoResponseResult.reason || null,
+      reason: teamEmailResult.reason || null,
     }),
     { status: 200, headers: { "Content-Type": "application/json" } }
   );

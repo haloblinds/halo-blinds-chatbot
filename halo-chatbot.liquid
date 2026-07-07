@@ -12,7 +12,7 @@
 {% endcomment %}
 
 {%- assign api_url = 'https://halo-blinds-chatbot.vercel.app/api/contact' -%}
-{%- assign brand_name = 'Halosupport' -%}
+{%- assign brand_name = 'Halo Support' -%}
 {%- assign brand_reply_time = 'Usually replies within 12 hours' -%}
 {%- assign avatar_url = 'https://cdn.shopify.com/s/files/1/1046/8307/7966/files/Titel_12.png?v=1783170226' -%}
 {%- assign teaser_delay_ms = 30000 -%}
@@ -20,11 +20,11 @@
 {%- assign intro_text = 'Have a question about our blinds? Leave your details and we will reply within 12 hours.' -%}
 
 <style>
-  .halo-chat-launcher{position:fixed;right:20px;bottom:20px;width:60px;height:60px;border-radius:50%;background:#fff;border:none;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;z-index:9998;transition:transform .15s ease;font-family:inherit;padding:0;overflow:hidden}
+  .halo-chat-launcher{position:fixed;right:20px;bottom:20px;width:60px;height:60px;border-radius:50%;background:#fff;border:none;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;z-index:9998;transition:transform .15s ease;font-family:inherit;padding:0}
   .halo-chat-launcher:hover{transform:scale(1.05)}
-  .halo-chat-launcher::after{content:'';position:absolute;top:4px;right:4px;width:12px;height:12px;background:#4ade80;border:2px solid #fff;border-radius:50%;z-index:2}
+  .halo-chat-launcher::after{content:'';position:absolute;top:2px;right:2px;width:14px;height:14px;background:#4ade80;border:2px solid #fff;border-radius:50%;z-index:3;box-shadow:0 1px 3px rgba(0,0,0,.15)}
   .halo-launcher-avatar{width:100%;height:100%;object-fit:cover;border-radius:50%}
-  .halo-chat-launcher .halo-chat-close{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#111;color:#fff}
+  .halo-chat-launcher .halo-chat-close{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#111;color:#fff;border-radius:50%}
   .halo-chat-launcher .halo-chat-close svg{width:22px;height:22px}
   .halo-chat-launcher.is-open .halo-launcher-avatar{display:none}
   .halo-chat-launcher.is-open::after{display:none}
@@ -277,7 +277,7 @@
       }
       playNotifSound();
       successTitle.textContent = 'Thanks, ' + name + '!';
-      successBody.innerHTML = 'We got your question and will reply to <strong>' + escapeHtml(email) + '</strong> within 12 hours. A confirmation is on its way to your inbox.';
+      successBody.innerHTML = 'We got your question and will personally reply to <strong>' + escapeHtml(email) + '</strong> within 12 hours, usually much sooner.';
       formView.classList.add('is-hidden');
       successView.classList.add('is-visible');
       body.scrollTop = 0;
